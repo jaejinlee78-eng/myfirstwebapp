@@ -100,7 +100,7 @@ def load_data() -> pd.DataFrame:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    # 분기 필터용 문자열 처리
+    # 필터용 문자열 처리
     if "기준_년분기_코드" in df.columns:
         df["기준_년분기_코드"] = df["기준_년분기_코드"].astype(str)
 
@@ -125,6 +125,20 @@ def format_count(value: int) -> str:
     return f"{value:,}개"
 
 
+def make_label(values: list[str], all_label: str = "전체") -> str:
+    """선택값을 화면 표시용 문자열로 변환"""
+    if not values:
+        return "선택 없음"
+
+    if all_label in values:
+        return all_label
+
+    if len(values) <= 3:
+        return ", ".join(values)
+
+    return f"{', '.join(values[:3])} 외 {len(values) - 3}개"
+
+
 # =========================================================
 # 5. 화면 제목
 # =========================================================
@@ -136,7 +150,7 @@ st.markdown(
 st.markdown(
     """
     <div class="sub-title">
-    선택한 분기 기준으로 상권 매출, 거래건수, 업종별 매출 TOP 10을 확인합니다.
+    선택한 조건 기준으로 상권 매출, 거래건수, 업종별 매출 TOP 10을 확인합니다.
     엑셀을 열지 않아도 되니 인류 문명은 아주 조금 전진했습니다.
     </div>
     """,
@@ -166,6 +180,7 @@ except UnicodeDecodeError:
 
 required_cols = [
     "기준_년분기_코드",
+    "상권유형",
     "분기매출액",
     "분기거래건수",
     "상권이름",
@@ -180,10 +195,13 @@ if missing_cols:
 
 
 # =========================================================
-# 7. 사이드바 필터
+# 7. 사이드바 데이터 필터
 # =========================================================
-st.sidebar.header("🔎 필터")
+st.sidebar.header("🧰 데이터 필터")
 
+# -------------------------
+# 필터 1: 분기 선택
+# -------------------------
 quarters = sorted(
     df["기준_년분기_코드"].dropna().unique(),
     key=lambda x: int(x) if str(x).isdigit() else str(x),
@@ -191,22 +209,105 @@ quarters = sorted(
 
 quarter_options = ["전체"] + quarters
 
-selected_quarter = st.sidebar.selectbox(
+selected_quarters = st.sidebar.multiselect(
     "📅 분기 선택",
-    quarter_options,
-    index=0,
+    options=quarter_options,
+    default=["전체"],
+    help="'전체'를 선택하면 모든 분기가 반영됩니다.",
 )
 
-if selected_quarter == "전체":
-    filtered_df = df.copy()
+# 전체 선택 또는 아무것도 선택하지 않은 경우 전체 데이터 기준
+if not selected_quarters or "전체" in selected_quarters:
+    quarter_filtered_df = df.copy()
 else:
-    filtered_df = df[df["기준_년분기_코드"] == selected_quarter].copy()
+    quarter_filtered_df = df[
+        df["기준_년분기_코드"].isin(selected_quarters)
+    ].copy()
+
+
+# -------------------------
+# 필터 2: 상권유형
+# -------------------------
+market_type_options = sorted(
+    quarter_filtered_df["상권유형"].dropna().unique()
+)
+
+default_market_types = [
+    market_type
+    for market_type in ["골목상권", "전통시장"]
+    if market_type in market_type_options
+]
+
+selected_market_types = st.sidebar.multiselect(
+    "🏘️ 상권유형",
+    options=market_type_options,
+    default=default_market_types,
+    help="기본값은 골목상권과 전통시장입니다.",
+)
+
+if selected_market_types:
+    market_type_filtered_df = quarter_filtered_df[
+        quarter_filtered_df["상권유형"].isin(selected_market_types)
+    ].copy()
+else:
+    market_type_filtered_df = quarter_filtered_df.iloc[0:0].copy()
+
+
+# -------------------------
+# 필터 3: 업종
+# -------------------------
+industry_options = sorted(
+    market_type_filtered_df["업종"].dropna().unique()
+)
+
+top5_industries = (
+    market_type_filtered_df
+    .groupby("업종", as_index=False)["분기매출액"]
+    .sum()
+    .sort_values("분기매출액", ascending=False)
+    .head(5)["업종"]
+    .tolist()
+)
+
+# 앞선 필터가 바뀌면 업종 기본값도 다시 상위 5개로 잡히도록 key 구성
+industry_filter_key = (
+    "industry_filter_"
+    + "_".join(selected_quarters)
+    + "_"
+    + "_".join(selected_market_types)
+)
+
+selected_industries = st.sidebar.multiselect(
+    "🛍️ 업종",
+    options=industry_options,
+    default=top5_industries,
+    key=industry_filter_key,
+    help="기본값은 선택된 분기와 상권유형 기준 매출 상위 5개 업종입니다.",
+)
+
+if selected_industries:
+    filtered_df = market_type_filtered_df[
+        market_type_filtered_df["업종"].isin(selected_industries)
+    ].copy()
+else:
+    filtered_df = market_type_filtered_df.iloc[0:0].copy()
+
+
+# -------------------------
+# 사이드바 데이터 정보
+# -------------------------
+st.sidebar.divider()
+
+st.sidebar.markdown("### 📦 선택 현황")
+st.sidebar.write(f"분기: **{make_label(selected_quarters)}**")
+st.sidebar.write(f"상권유형: **{make_label(selected_market_types)}**")
+st.sidebar.write(f"업종: **{make_label(selected_industries)}**")
 
 st.sidebar.divider()
 
-st.sidebar.markdown("### 📦 데이터 정보")
+st.sidebar.markdown("### 📊 데이터 건수")
 st.sidebar.write(f"전체 데이터: **{len(df):,}건**")
-st.sidebar.write(f"현재 선택 데이터: **{len(filtered_df):,}건**")
+st.sidebar.write(f"필터 적용 데이터: **{len(filtered_df):,}건**")
 
 
 # =========================================================
@@ -245,10 +346,9 @@ with col4:
         value=format_count(industry_count),
     )
 
-if selected_quarter == "전체":
-    st.info(f"🌐 현재 **전체 분기** 기준으로 분석 중입니다. 총 **{len(filtered_df):,}건**이 반영되었습니다.")
-else:
-    st.info(f"📅 현재 **{selected_quarter} 분기** 기준으로 분석 중입니다. 총 **{len(filtered_df):,}건**이 반영되었습니다.")
+st.info(
+    f"🔎 현재 필터 기준으로 총 **{len(filtered_df):,}건**의 데이터가 반영되었습니다."
+)
 
 
 # =========================================================
@@ -366,7 +466,7 @@ else:
 # =========================================================
 st.divider()
 
-with st.expander("🧩 원본 데이터 미리보기"):
+with st.expander("🧩 필터 적용 데이터 미리보기"):
     st.dataframe(
         filtered_df.head(30),
         use_container_width=True,
