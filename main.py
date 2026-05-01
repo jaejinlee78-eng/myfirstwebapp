@@ -26,46 +26,94 @@ DATA_FILE = Path(__file__).parent / DATA_FILE_NAME
 st.markdown(
     """
     <style>
+    .stApp {
+        background-color: #0f1117;
+        color: #f9fafb;
+    }
+
     .main-title {
         font-size: 34px;
         font-weight: 800;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
+        color: #f9fafb;
+        letter-spacing: -0.5px;
     }
 
     .sub-title {
         font-size: 16px;
-        color: #666666;
-        margin-bottom: 24px;
+        color: #cbd5e1;
+        margin-bottom: 28px;
+        line-height: 1.6;
     }
 
     .section-title {
-        font-size: 22px;
-        font-weight: 700;
-        margin-top: 10px;
-        margin-bottom: 12px;
+        font-size: 23px;
+        font-weight: 800;
+        margin-top: 14px;
+        margin-bottom: 14px;
+        color: #f9fafb;
     }
 
     div[data-testid="stMetric"] {
-        background-color: #ffffff;
-        border: 1px solid #eeeeee;
-        padding: 18px 20px;
-        border-radius: 18px;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+        background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        padding: 20px 22px;
+        border-radius: 20px;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.30);
+        min-height: 112px;
     }
 
     div[data-testid="stMetricLabel"] {
+        color: #cbd5e1 !important;
         font-size: 15px;
-        font-weight: 600;
+        font-weight: 700;
+    }
+
+    div[data-testid="stMetricLabel"] p {
+        color: #cbd5e1 !important;
+        font-size: 15px;
+        font-weight: 700;
     }
 
     div[data-testid="stMetricValue"] {
-        font-size: 26px;
-        font-weight: 800;
+        color: #ffffff !important;
+        font-size: 28px;
+        font-weight: 900;
     }
 
-    .small-note {
-        font-size: 14px;
-        color: #777777;
+    div[data-testid="stMetricValue"] div {
+        color: #ffffff !important;
+    }
+
+    hr {
+        border-color: rgba(255, 255, 255, 0.12);
+        margin-top: 28px;
+        margin-bottom: 28px;
+    }
+
+    section[data-testid="stSidebar"] {
+        background-color: #111827;
+    }
+
+    section[data-testid="stSidebar"] * {
+        color: #f9fafb;
+    }
+
+    .filter-count-box {
+        background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+        padding: 14px 16px;
+        border-radius: 14px;
+        color: #ffffff;
+        font-size: 16px;
+        font-weight: 800;
+        margin-top: 18px;
+        text-align: center;
+        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+    }
+
+    div[data-testid="stDataFrame"] {
+        border-radius: 14px;
+        overflow: hidden;
     }
     </style>
     """,
@@ -78,7 +126,7 @@ st.markdown(
 # =========================================================
 @st.cache_data
 def load_data() -> pd.DataFrame:
-    df = pd.read_csv(DATA_FILE, encoding="cp949")
+    data = pd.read_csv(DATA_FILE, encoding="cp949")
 
     rename_map = {
         "상권_구분_코드_명": "상권유형",
@@ -89,44 +137,37 @@ def load_data() -> pd.DataFrame:
         "당월_매출_건수": "분기거래건수",
     }
 
-    df = df.rename(columns=rename_map)
+    data = data.rename(columns=rename_map)
 
-    # 혹시 원본 파일에 오타 컬럼명이 들어간 경우까지 방어
-    if "당월_매추_건수" in df.columns and "분기거래건수" not in df.columns:
-        df = df.rename(columns={"당월_매추_건수": "분기거래건수"})
+    if "당월_매추_건수" in data.columns and "분기거래건수" not in data.columns:
+        data = data.rename(columns={"당월_매추_건수": "분기거래건수"})
 
-    # 필수 숫자열 변환
     for col in ["분기매출액", "분기거래건수"]:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+        if col in data.columns:
+            data[col] = pd.to_numeric(data[col], errors="coerce").fillna(0)
 
-    # 필터용 문자열 처리
-    if "기준_년분기_코드" in df.columns:
-        df["기준_년분기_코드"] = df["기준_년분기_코드"].astype(str)
+    if "기준_년분기_코드" in data.columns:
+        data["기준_년분기_코드"] = data["기준_년분기_코드"].astype(str)
 
-    return df
+    return data
 
 
 # =========================================================
-# 4. 표시용 포맷 함수
+# 4. 표시용 함수
 # =========================================================
 def format_eok(value: float) -> str:
-    """원 단위 금액을 억 원 단위로 표기"""
     return f"{value / 100_000_000:,.1f}억 원"
 
 
 def format_man(value: float) -> str:
-    """건수를 만 건 단위로 표기"""
     return f"{value / 10_000:,.1f}만 건"
 
 
 def format_count(value: int) -> str:
-    """개수 표기"""
     return f"{value:,}개"
 
 
 def make_label(values: list[str], all_label: str = "전체") -> str:
-    """선택값을 화면 표시용 문자열로 변환"""
     if not values:
         return "선택 없음"
 
@@ -140,7 +181,7 @@ def make_label(values: list[str], all_label: str = "전체") -> str:
 
 
 # =========================================================
-# 5. 화면 제목
+# 5. 제목
 # =========================================================
 st.markdown(
     '<div class="main-title">🏙️ 서울시 상권분석 대시보드</div>',
@@ -150,8 +191,8 @@ st.markdown(
 st.markdown(
     """
     <div class="sub-title">
-    선택한 조건 기준으로 상권 매출, 거래건수, 업종별 매출 TOP 10을 확인합니다.
-    엑셀을 열지 않아도 되니 인류 문명은 아주 조금 전진했습니다.
+    선택한 분기, 상권유형, 업종 조건을 기준으로 상권 매출과 거래 현황을 확인합니다.
+    엑셀 대신 웹앱이라니, 인간 문명도 가끔은 전진합니다.
     </div>
     """,
     unsafe_allow_html=True,
@@ -159,10 +200,10 @@ st.markdown(
 
 
 # =========================================================
-# 6. 데이터 로딩 및 검증
+# 6. 데이터 로딩 및 필수 컬럼 검증
 # =========================================================
 try:
-    df = load_data()
+    data = load_data()
 
 except FileNotFoundError:
     st.error(
@@ -187,7 +228,7 @@ required_cols = [
     "업종",
 ]
 
-missing_cols = [col for col in required_cols if col not in df.columns]
+missing_cols = [col for col in required_cols if col not in data.columns]
 
 if missing_cols:
     st.error(f"❌ 필요한 열이 없습니다: {', '.join(missing_cols)}")
@@ -202,34 +243,25 @@ st.sidebar.header("🧰 데이터 필터")
 # -------------------------
 # 필터 1: 분기 선택
 # -------------------------
-quarters = sorted(
-    df["기준_년분기_코드"].dropna().unique(),
+quarter_options = sorted(
+    data["기준_년분기_코드"].dropna().unique(),
     key=lambda x: int(x) if str(x).isdigit() else str(x),
 )
 
-quarter_options = ["전체"] + quarters
+quarter_select_options = ["전체"] + quarter_options
 
 selected_quarters = st.sidebar.multiselect(
     "📅 분기 선택",
-    options=quarter_options,
+    options=quarter_select_options,
     default=["전체"],
     help="'전체'를 선택하면 모든 분기가 반영됩니다.",
 )
-
-# 전체 선택 또는 아무것도 선택하지 않은 경우 전체 데이터 기준
-if not selected_quarters or "전체" in selected_quarters:
-    quarter_filtered_df = df.copy()
-else:
-    quarter_filtered_df = df[
-        df["기준_년분기_코드"].isin(selected_quarters)
-    ].copy()
-
 
 # -------------------------
 # 필터 2: 상권유형
 # -------------------------
 market_type_options = sorted(
-    quarter_filtered_df["상권유형"].dropna().unique()
+    data["상권유형"].dropna().unique()
 )
 
 default_market_types = [
@@ -242,26 +274,35 @@ selected_market_types = st.sidebar.multiselect(
     "🏘️ 상권유형",
     options=market_type_options,
     default=default_market_types,
-    help="기본값은 골목상권과 전통시장입니다.",
 )
 
-if selected_market_types:
-    market_type_filtered_df = quarter_filtered_df[
-        quarter_filtered_df["상권유형"].isin(selected_market_types)
-    ].copy()
-else:
-    market_type_filtered_df = quarter_filtered_df.iloc[0:0].copy()
+# -------------------------
+# 업종 기본값 계산용 임시 데이터
+# 분기 + 상권유형 조건까지만 먼저 반영
+# -------------------------
+temp_data = data.copy()
 
+if selected_quarters and "전체" not in selected_quarters:
+    temp_data = temp_data[
+        temp_data["기준_년분기_코드"].isin(selected_quarters)
+    ]
+
+if selected_market_types:
+    temp_data = temp_data[
+        temp_data["상권유형"].isin(selected_market_types)
+    ]
+else:
+    temp_data = temp_data.iloc[0:0]
 
 # -------------------------
 # 필터 3: 업종
 # -------------------------
 industry_options = sorted(
-    market_type_filtered_df["업종"].dropna().unique()
+    temp_data["업종"].dropna().unique()
 )
 
-top5_industries = (
-    market_type_filtered_df
+default_industries = (
+    temp_data
     .groupby("업종", as_index=False)["분기매출액"]
     .sum()
     .sort_values("분기매출액", ascending=False)
@@ -269,36 +310,56 @@ top5_industries = (
     .tolist()
 )
 
-# 앞선 필터가 바뀌면 업종 기본값도 다시 상위 5개로 잡히도록 key 구성
 industry_filter_key = (
     "industry_filter_"
-    + "_".join(selected_quarters)
+    + "_".join(selected_quarters if selected_quarters else ["none"])
     + "_"
-    + "_".join(selected_market_types)
+    + "_".join(selected_market_types if selected_market_types else ["none"])
 )
 
 selected_industries = st.sidebar.multiselect(
     "🛍️ 업종",
     options=industry_options,
-    default=top5_industries,
+    default=default_industries,
     key=industry_filter_key,
     help="기본값은 선택된 분기와 상권유형 기준 매출 상위 5개 업종입니다.",
 )
 
-if selected_industries:
-    filtered_df = market_type_filtered_df[
-        market_type_filtered_df["업종"].isin(selected_industries)
-    ].copy()
+
+# =========================================================
+# 8. 최종 필터링 데이터 생성
+# =========================================================
+filtered_data = data.copy()
+
+# 분기 조건 반영
+if selected_quarters and "전체" not in selected_quarters:
+    filtered_data = filtered_data[
+        filtered_data["기준_년분기_코드"].isin(selected_quarters)
+    ]
+
+# 상권유형 조건 반영
+if selected_market_types:
+    filtered_data = filtered_data[
+        filtered_data["상권유형"].isin(selected_market_types)
+    ]
 else:
-    filtered_df = market_type_filtered_df.iloc[0:0].copy()
+    filtered_data = filtered_data.iloc[0:0]
+
+# 업종 조건 반영
+if selected_industries:
+    filtered_data = filtered_data[
+        filtered_data["업종"].isin(selected_industries)
+    ]
+else:
+    filtered_data = filtered_data.iloc[0:0]
 
 
 # -------------------------
-# 사이드바 데이터 정보
+# 사이드바 선택 현황 및 건수
 # -------------------------
 st.sidebar.divider()
 
-st.sidebar.markdown("### 📦 선택 현황")
+st.sidebar.markdown("### 📌 선택 현황")
 st.sidebar.write(f"분기: **{make_label(selected_quarters)}**")
 st.sidebar.write(f"상권유형: **{make_label(selected_market_types)}**")
 st.sidebar.write(f"업종: **{make_label(selected_industries)}**")
@@ -306,17 +367,26 @@ st.sidebar.write(f"업종: **{make_label(selected_industries)}**")
 st.sidebar.divider()
 
 st.sidebar.markdown("### 📊 데이터 건수")
-st.sidebar.write(f"전체 데이터: **{len(df):,}건**")
-st.sidebar.write(f"필터 적용 데이터: **{len(filtered_df):,}건**")
+st.sidebar.write(f"전체 데이터: **{len(data):,}건**")
+
+st.sidebar.markdown(
+    f"""
+    <div class="filter-count-box">
+    🔎 필터링된 데이터: {len(filtered_data):,}건
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 # =========================================================
-# 8. 핵심 메트릭
+# 9. KPI 계산
+# 모든 KPI는 filtered_data 기준
 # =========================================================
-total_sales = filtered_df["분기매출액"].sum()
-total_transactions = filtered_df["분기거래건수"].sum()
-market_count = filtered_df["상권이름"].nunique(dropna=True)
-industry_count = filtered_df["업종"].nunique(dropna=True)
+total_sales = filtered_data["분기매출액"].sum()
+total_transactions = filtered_data["분기거래건수"].sum()
+market_count = filtered_data["상권이름"].nunique(dropna=True)
+industry_count = filtered_data["업종"].nunique(dropna=True)
 
 st.markdown('<div class="section-title">📌 핵심 지표</div>', unsafe_allow_html=True)
 
@@ -347,12 +417,13 @@ with col4:
     )
 
 st.info(
-    f"🔎 현재 필터 기준으로 총 **{len(filtered_df):,}건**의 데이터가 반영되었습니다."
+    f"🔎 현재 필터 기준으로 총 **{len(filtered_data):,}건**의 데이터가 반영되었습니다."
 )
 
 
 # =========================================================
-# 9. 업종별 분기 매출 TOP 10
+# 10. 업종별 분기 매출 TOP 10
+# 차트도 filtered_data 기준
 # =========================================================
 st.divider()
 
@@ -362,7 +433,7 @@ st.markdown(
 )
 
 top10_industry_sales = (
-    filtered_df
+    filtered_data
     .groupby("업종", as_index=False)["분기매출액"]
     .sum()
     .sort_values("분기매출액", ascending=False)
@@ -462,13 +533,13 @@ else:
 
 
 # =========================================================
-# 10. 데이터 미리보기
+# 11. 필터 적용 데이터 미리보기
 # =========================================================
 st.divider()
 
 with st.expander("🧩 필터 적용 데이터 미리보기"):
     st.dataframe(
-        filtered_df.head(30),
+        filtered_data.head(30),
         use_container_width=True,
         hide_index=True,
     )
