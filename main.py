@@ -1,3 +1,23 @@
+from pathlib import Path
+
+import altair as alt
+import pandas as pd
+import streamlit as st
+
+
+# =========================================================
+# 1. 기본 설정
+# =========================================================
+st.set_page_config(
+    page_title="서울시 상권분석 대시보드",
+    page_icon="🏙️",
+    layout="wide",
+)
+
+DATA_FILE_NAME = "서울시_상권분석서비스_샘플.csv"
+DATA_FILE = Path(__file__).parent / DATA_FILE_NAME
+
+
 # =========================================================
 # 2. 스타일
 # =========================================================
@@ -10,7 +30,6 @@ st.markdown(
         color: #f9fafb;
     }
 
-    /* 제목 */
     .main-title {
         font-size: 34px;
         font-weight: 800;
@@ -34,7 +53,6 @@ st.markdown(
         color: #f9fafb;
     }
 
-    /* 메트릭 카드 */
     div[data-testid="stMetric"] {
         background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
         border: 1px solid rgba(255, 255, 255, 0.10);
@@ -44,7 +62,6 @@ st.markdown(
         min-height: 112px;
     }
 
-    /* 메트릭 라벨 */
     div[data-testid="stMetricLabel"] {
         color: #cbd5e1 !important;
         font-size: 15px;
@@ -57,7 +74,6 @@ st.markdown(
         font-weight: 700;
     }
 
-    /* 메트릭 값 */
     div[data-testid="stMetricValue"] {
         color: #ffffff !important;
         font-size: 28px;
@@ -68,19 +84,12 @@ st.markdown(
         color: #ffffff !important;
     }
 
-    /* 안내 박스 */
-    div[data-testid="stAlert"] {
-        border-radius: 14px;
-    }
-
-    /* 구분선 */
     hr {
         border-color: rgba(255, 255, 255, 0.12);
         margin-top: 28px;
         margin-bottom: 28px;
     }
 
-    /* 사이드바 */
     section[data-testid="stSidebar"] {
         background-color: #111827;
     }
@@ -89,7 +98,6 @@ st.markdown(
         color: #f9fafb;
     }
 
-    /* 데이터프레임 영역 */
     div[data-testid="stDataFrame"] {
         border-radius: 14px;
         overflow: hidden;
