@@ -107,8 +107,26 @@ st.markdown(
         font-size: 16px;
         font-weight: 800;
         margin-top: 18px;
+        margin-bottom: 14px;
         text-align: center;
         box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+    }
+
+    .source-text {
+        font-size: 12px;
+        color: #94a3b8 !important;
+        line-height: 1.5;
+        margin-top: 18px;
+    }
+
+    .footer {
+        text-align: center;
+        color: #94a3b8;
+        font-size: 13px;
+        margin-top: 40px;
+        padding-top: 18px;
+        padding-bottom: 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
     }
 
     div[data-testid="stDataFrame"] {
@@ -139,6 +157,7 @@ def load_data() -> pd.DataFrame:
 
     data = data.rename(columns=rename_map)
 
+    # 혹시 원본 컬럼명에 오타가 있는 경우 방어
     if "당월_매추_건수" in data.columns and "분기거래건수" not in data.columns:
         data = data.rename(columns={"당월_매추_건수": "분기거래건수"})
 
@@ -261,6 +280,9 @@ if missing_cols:
 # =========================================================
 st.sidebar.header("🧰 데이터 필터")
 
+# -------------------------
+# 필터 1: 분기 선택
+# -------------------------
 quarter_options = sorted(
     data["기준_년분기_코드"].dropna().unique(),
     key=lambda x: int(x) if str(x).isdigit() else str(x),
@@ -275,6 +297,9 @@ selected_quarters = st.sidebar.multiselect(
     help="'전체'를 선택하면 모든 분기가 반영됩니다.",
 )
 
+# -------------------------
+# 필터 2: 상권유형
+# -------------------------
 market_type_options = sorted(
     data["상권유형"].dropna().unique()
 )
@@ -291,6 +316,10 @@ selected_market_types = st.sidebar.multiselect(
     default=default_market_types,
 )
 
+# -------------------------
+# 업종 기본값 계산용 임시 데이터
+# 분기 + 상권유형 조건까지만 먼저 반영
+# -------------------------
 temp_data = data.copy()
 
 if selected_quarters and "전체" not in selected_quarters:
@@ -305,6 +334,9 @@ if selected_market_types:
 else:
     temp_data = temp_data.iloc[0:0]
 
+# -------------------------
+# 필터 3: 업종
+# -------------------------
 industry_options = sorted(
     temp_data["업종"].dropna().unique()
 )
@@ -360,7 +392,7 @@ else:
 
 
 # =========================================================
-# 9. 사이드바 선택 현황
+# 9. 사이드바 선택 현황, 다운로드, 출처
 # =========================================================
 st.sidebar.divider()
 
@@ -378,6 +410,26 @@ st.sidebar.markdown(
     f"""
     <div class="filter-count-box">
     🔎 필터링된 데이터: {len(filtered_data):,}건
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+csv_data = filtered_data.to_csv(index=False).encode("cp949", errors="replace")
+
+st.sidebar.download_button(
+    label="📥 데이터 다운로드(CSV)",
+    data=csv_data,
+    file_name="상권분석_필터링데이터.csv",
+    mime="text/csv",
+    use_container_width=True,
+)
+
+st.sidebar.markdown(
+    """
+    <div class="source-text">
+    데이터 출처: 서울 열린데이터광장<br>
+    https://data.seoul.go.kr/
     </div>
     """,
     unsafe_allow_html=True,
@@ -759,3 +811,16 @@ with st.expander("🧩 필터 적용 데이터 미리보기"):
         use_container_width=True,
         hide_index=True,
     )
+
+
+# =========================================================
+# 14. 푸터
+# =========================================================
+st.markdown(
+    """
+    <div class="footer">
+    made by 재진's
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
